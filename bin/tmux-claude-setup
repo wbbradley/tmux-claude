@@ -82,34 +82,12 @@ with open(settings_path, "w") as f:
 
 echo "Hooks merged into $SETTINGS"
 
-# 3. Configure tmux (only if inside tmux)
+# 3. Configure tmux (now if inside tmux, otherwise lazily on first hook fire)
+"$BIN_DIR/tmux-claude-ensure-tmux"
 if [ -n "$TMUX" ]; then
-    # Check if we already added our status script
-    CURRENT_SR=$(tmux show-option -gv status-right 2>/dev/null || echo "")
-    if echo "$CURRENT_SR" | grep -q "tmux-claude-status"; then
-        echo "Status bar already configured"
-    else
-        tmux set-option -ag status-right " #($BIN_DIR/tmux-claude-status)"
-    fi
-
-    # Increase status-right-length if needed
-    CURRENT_LEN=$(tmux show-option -gv status-right-length 2>/dev/null || echo "40")
-    if [ "$CURRENT_LEN" -lt 80 ] 2>/dev/null; then
-        tmux set-option -g status-right-length 80
-    fi
-
-    # Bind prefix + g to jump
-    tmux bind-key g run-shell "$BIN_DIR/tmux-claude-jump"
-
-    # Clear waiting state when switching to a pane
-    if ! tmux show-hooks -g 2>/dev/null | grep -q "tmux-claude-focus"; then
-        tmux set-hook -ga after-select-pane "run-shell \"$BIN_DIR/tmux-claude-focus '#{pane_id}'\""
-        tmux set-hook -ga after-select-window "run-shell \"$BIN_DIR/tmux-claude-focus '#{pane_id}'\""
-    fi
-
     echo "tmux configured: status bar + prefix-g binding + focus-clears-waiting"
 else
-    echo "Not inside tmux — skipping tmux configuration (run inside tmux to enable)"
+    echo "Not inside tmux — tmux will be configured automatically on first Claude hook fire"
 fi
 
 echo ""

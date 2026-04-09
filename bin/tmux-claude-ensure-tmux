@@ -1,0 +1,40 @@
+#!/bin/sh
+# Idempotently configure tmux integration (status bar, keybinding, focus hooks).
+# Called lazily by hook scripts — safe to run repeatedly, fast no-op after first run.
+[ -n "$TMUX" ] || exit 0
+
+STATE_DIR="/tmp/tmux-claude-$(id -u)"
+MARKER="$STATE_DIR/.tmux-configured"
+BIN_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+# Fast path: already configured for this tmux server
+if [ -f "$MARKER" ]; then
+    SAVED_TMUX=$(cat "$MARKER")
+    [ "$SAVED_TMUX" = "$TMUX" ] && exit 0
+fi
+
+mkdir -p "$STATE_DIR"
+
+# Status bar
+CURRENT_SR=$(tmux show-option -gv status-right 2>/dev/null || echo "")
+if ! echo "$CURRENT_SR" | grep -q "tmux-claude-status"; then
+    tmux set-option -ag status-right " #($BIN_DIR/tmux-claude-status)"
+fi
+
+# Status bar length
+CURRENT_LEN=$(tmux show-option -gv status-right-length 2>/dev/null || echo "40")
+if [ "$CURRENT_LEN" -lt 80 ] 2>/dev/null; then
+    tmux set-option -g status-right-length 80
+fi
+
+# Keybinding
+tmux bind-key g run-shell "$BIN_DIR/tmux-claude-jump"
+
+# Focus hooks
+if ! tmux show-hooks -g 2>/dev/null | grep -q "tmux-claude-focus"; then
+    tmux set-hook -ga after-select-pane "run-shell \"$BIN_DIR/tmux-claude-focus '#{pane_id}'\""
+    tmux set-hook -ga after-select-window "run-shell \"$BIN_DIR/tmux-claude-focus '#{pane_id}'\""
+fi
+
+# Mark as configured for this tmux server
+printf '%s' "$TMUX" > "$MARKER"

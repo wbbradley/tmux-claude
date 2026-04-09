@@ -20,13 +20,11 @@ git clone <repo-url> ~/src/tmux-claude
 ~/src/tmux-claude/bin/tmux-claude-setup
 ```
 
-Run `tmux-claude-setup` from inside a tmux session. It will:
-
-1. Register Claude Code hooks in `~/.claude/settings.json` (merged with your
-   existing hooks, not overwritten)
-2. Append a status bar segment to `status-right`
-3. Bind `prefix + g` to the jump script
-4. Register tmux hooks to clear waiting state on pane/window focus
+Run `tmux-claude-setup` from anywhere — inside or outside tmux. It registers
+Claude Code hooks in `~/.claude/settings.json` (merged with your existing hooks,
+not overwritten). The tmux-side configuration (status bar, keybinding, focus
+hooks) is set up automatically the first time a Claude Code hook fires inside a
+tmux session, so there's nothing else to do.
 
 Setup is idempotent — safe to run multiple times.
 
@@ -57,7 +55,7 @@ script finds the oldest `.waiting` file and switches to that pane.
 
 | Script | Purpose |
 |---|---|
-| `tmux-claude-setup` | Install hooks, tmux bindings, status bar |
+| `tmux-claude-setup` | One-time install: register Claude Code hooks |
 | `tmux-claude-teardown` | Clean uninstall of everything |
 | `tmux-claude-notify` | Hook: create waiting state + bell |
 | `tmux-claude-resume` | Hook: clear waiting state (prompt submit) |
