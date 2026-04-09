@@ -1,0 +1,12 @@
+#!/bin/sh
+STATE_DIR="/tmp/tmux-claude-$(id -u)"
+# GC stale files older than 24h
+find "$STATE_DIR" -name '*.waiting' -mtime +1 -delete 2>/dev/null
+COUNT=$(ls "$STATE_DIR"/*.waiting 2>/dev/null | wc -l | tr -d ' ')
+if [ "$COUNT" -eq 0 ]; then
+    echo ""
+elif [ "$COUNT" -eq 1 ]; then
+    echo "#[fg=yellow,bold][Claude waiting]#[default]"
+else
+    echo "#[fg=yellow,bold][Claude: ${COUNT} waiting]#[default]"
+fi

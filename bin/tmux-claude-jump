@@ -1,0 +1,17 @@
+#!/bin/sh
+STATE_DIR="/tmp/tmux-claude-$(id -u)"
+OLDEST=$(ls -tr "$STATE_DIR"/*.waiting 2>/dev/null | head -1)
+if [ -z "$OLDEST" ]; then
+    tmux display-message "No Claude sessions waiting"
+    exit 0
+fi
+PANE_ID=$(basename "$OLDEST" .waiting)
+TARGET=$(tmux list-panes -a -F "#{pane_id} #{session_name}:#{window_index}" | \
+         grep "^${PANE_ID} " | awk '{print $2}')
+if [ -n "$TARGET" ]; then
+    tmux select-window -t "$TARGET"
+    tmux select-pane -t "$PANE_ID"
+else
+    rm -f "$OLDEST"
+    tmux display-message "Claude pane no longer exists"
+fi

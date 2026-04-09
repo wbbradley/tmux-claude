@@ -1,0 +1,4 @@
+#!/bin/sh
+STATE_DIR="/tmp/tmux-claude-$(id -u)"
+[ -n "$TMUX_PANE" ] || exit 0
+rm -f "$STATE_DIR/${TMUX_PANE}.waiting"

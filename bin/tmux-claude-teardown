@@ -1,0 +1,70 @@
+#!/bin/sh
+set -e
+
+BIN_DIR="$(cd "$(dirname "$0")" && pwd)"
+STATE_DIR="/tmp/tmux-claude-$(id -u)"
+SETTINGS="$HOME/.claude/settings.json"
+
+# 1. Remove tmux-claude hooks from settings.json
+if [ -f "$SETTINGS" ]; then
+    python3 -c '
+import json, sys
+
+settings_path = sys.argv[1]
+
+with open(settings_path) as f:
+    settings = json.load(f)
+
+hooks = settings.get("hooks", {})
+
+for event in list(hooks.keys()):
+    cleaned = [e for e in hooks[event] if not any(
+        "tmux-claude-" in h.get("command", "")
+        for h in e.get("hooks", [])
+    )]
+    if cleaned:
+        hooks[event] = cleaned
+    else:
+        del hooks[event]
+
+if hooks:
+    settings["hooks"] = hooks
+else:
+    del settings["hooks"]
+
+with open(settings_path, "w") as f:
+    json.dump(settings, f, indent=2)
+    f.write("\n")
+' "$SETTINGS"
+    echo "Hooks removed from $SETTINGS"
+fi
+
+# 2. Strip our addition from tmux status-right (only if inside tmux)
+if [ -n "$TMUX" ]; then
+    CURRENT_SR=$(tmux show-option -gv status-right 2>/dev/null || echo "")
+    CLEANED=$(echo "$CURRENT_SR" | sed "s| #($BIN_DIR/tmux-claude-status)||g")
+    if [ "$CLEANED" != "$CURRENT_SR" ]; then
+        tmux set-option -g status-right "$CLEANED"
+        echo "Removed tmux-claude-status from status bar"
+    fi
+
+    tmux unbind-key g 2>/dev/null || true
+
+    # Remove our after-select-pane / after-select-window hooks
+    for HOOK_NAME in after-select-pane after-select-window; do
+        HOOK_INDEX=$(tmux show-hooks -g 2>/dev/null | grep "$HOOK_NAME.*tmux-claude-focus" | sed 's/.*\[\([0-9]*\)\].*/\1/' | head -1)
+        if [ -n "$HOOK_INDEX" ]; then
+            tmux set-hook -gu "${HOOK_NAME}[$HOOK_INDEX]"
+        fi
+    done
+    echo "Removed focus hooks"
+
+    echo "Unbound prefix + g"
+else
+    echo "Not inside tmux — skipping tmux cleanup"
+fi
+
+# 3. Remove state directory
+rm -rf "$STATE_DIR"
+echo ""
+echo "tmux-claude teardown complete."

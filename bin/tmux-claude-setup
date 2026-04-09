@@ -1,0 +1,119 @@
+#!/bin/sh
+set -e
+
+BIN_DIR="$(cd "$(dirname "$0")" && pwd)"
+STATE_DIR="/tmp/tmux-claude-$(id -u)"
+SETTINGS="$HOME/.claude/settings.json"
+# 1. Create state directory
+mkdir -p "$STATE_DIR"
+
+# 2. Merge hooks into settings.json
+if [ ! -f "$SETTINGS" ]; then
+    echo '{}' > "$SETTINGS"
+fi
+
+python3 -c '
+import json, sys
+
+bin_dir = sys.argv[1]
+settings_path = sys.argv[2]
+
+with open(settings_path) as f:
+    settings = json.load(f)
+
+hooks = settings.get("hooks", {})
+
+# Define the hooks we want to add
+tmux_hooks = {
+    "Stop": [
+        {
+            "matcher": "",
+            "hooks": [{"type": "command", "command": bin_dir + "/tmux-claude-notify"}]
+        }
+    ],
+    "Notification": [
+        {
+            "matcher": "",
+            "hooks": [{"type": "command", "command": bin_dir + "/tmux-claude-notify"}]
+        }
+    ],
+    "PreToolUse": [
+        {
+            "matcher": "AskUserQuestion",
+            "hooks": [{"type": "command", "command": bin_dir + "/tmux-claude-notify"}]
+        }
+    ],
+    "PermissionRequest": [
+        {
+            "matcher": "",
+            "hooks": [{"type": "command", "command": bin_dir + "/tmux-claude-notify"}]
+        }
+    ],
+    "UserPromptSubmit": [
+        {
+            "matcher": "",
+            "hooks": [{"type": "command", "command": bin_dir + "/tmux-claude-resume"}]
+        }
+    ],
+    "SessionEnd": [
+        {
+            "matcher": "",
+            "hooks": [{"type": "command", "command": bin_dir + "/tmux-claude-cleanup"}]
+        }
+    ],
+}
+
+for event, new_entries in tmux_hooks.items():
+    existing = hooks.get(event, [])
+    # Remove any previous tmux-claude entries
+    cleaned = [e for e in existing if not any(
+        "tmux-claude-" in h.get("command", "")
+        for h in e.get("hooks", [])
+    )]
+    cleaned.extend(new_entries)
+    hooks[event] = cleaned
+
+settings["hooks"] = hooks
+
+with open(settings_path, "w") as f:
+    json.dump(settings, f, indent=2)
+    f.write("\n")
+' "$BIN_DIR" "$SETTINGS"
+
+echo "Hooks merged into $SETTINGS"
+
+# 3. Configure tmux (only if inside tmux)
+if [ -n "$TMUX" ]; then
+    # Check if we already added our status script
+    CURRENT_SR=$(tmux show-option -gv status-right 2>/dev/null || echo "")
+    if echo "$CURRENT_SR" | grep -q "tmux-claude-status"; then
+        echo "Status bar already configured"
+    else
+        tmux set-option -ag status-right " #($BIN_DIR/tmux-claude-status)"
+    fi
+
+    # Increase status-right-length if needed
+    CURRENT_LEN=$(tmux show-option -gv status-right-length 2>/dev/null || echo "40")
+    if [ "$CURRENT_LEN" -lt 80 ] 2>/dev/null; then
+        tmux set-option -g status-right-length 80
+    fi
+
+    # Bind prefix + g to jump
+    tmux bind-key g run-shell "$BIN_DIR/tmux-claude-jump"
+
+    # Clear waiting state when switching to a pane
+    if ! tmux show-hooks -g 2>/dev/null | grep -q "tmux-claude-focus"; then
+        tmux set-hook -ga after-select-pane "run-shell \"$BIN_DIR/tmux-claude-focus '#{pane_id}'\""
+        tmux set-hook -ga after-select-window "run-shell \"$BIN_DIR/tmux-claude-focus '#{pane_id}'\""
+    fi
+
+    echo "tmux configured: status bar + prefix-g binding + focus-clears-waiting"
+else
+    echo "Not inside tmux — skipping tmux configuration (run inside tmux to enable)"
+fi
+
+echo ""
+echo "tmux-claude setup complete."
+echo "  Status bar: shows [Claude waiting] when sessions need input"
+echo "  prefix + g: jump to the oldest waiting Claude pane"
+echo "  Run '$BIN_DIR/tmux-claude-teardown' to uninstall"

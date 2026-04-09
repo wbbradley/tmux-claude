@@ -1,0 +1,5 @@
+#!/bin/sh
+# Called by tmux pane-focus-in hook with the pane ID as $1
+STATE_DIR="/tmp/tmux-claude-$(id -u)"
+[ -n "$1" ] || exit 0
+rm -f "$STATE_DIR/$1.waiting"
