@@ -12,6 +12,8 @@ Code session is waiting for input, and provides a keybinding to jump to it.
 - **Auto-clear on focus**: switching to a pane clears its waiting state
 - **Zero config**: no changes to `tmux.conf` required — everything is configured
   programmatically
+- **Safe outside tmux**: all hooks exit silently when not in a tmux session, so
+  Claude Code works normally without tmux
 
 ## Install
 
@@ -57,6 +59,7 @@ script finds the oldest `.waiting` file and switches to that pane.
 |---|---|
 | `tmux-claude-setup` | One-time install: register Claude Code hooks |
 | `tmux-claude-teardown` | Clean uninstall of everything |
+| `tmux-claude-ensure-tmux` | Lazy init: configure tmux on first hook fire |
 | `tmux-claude-notify` | Hook: create waiting state + bell |
 | `tmux-claude-resume` | Hook: clear waiting state (prompt submit) |
 | `tmux-claude-cleanup` | Hook: clear waiting state (session end) |
