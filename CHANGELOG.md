@@ -1,3 +1,10 @@
+## [0.1.1] - 2026-04-09
+
+### Changed
+- `prefix + g` now clears the current pane's waiting state before jumping, so
+  pressing it from inside a waiting pane advances to the next waiter instead of
+  no-opping on the current one.
+
 ## [0.1.0] - 2026-04-08
 
 ### Added

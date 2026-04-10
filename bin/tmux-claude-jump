@@ -1,5 +1,11 @@
 #!/bin/sh
 STATE_DIR="/tmp/tmux-claude-$(id -u)"
+
+# If the current pane is itself waiting, clear it and move on — the user is
+# already here and has seen the prompt.
+CURRENT_PANE=$(tmux display-message -p '#{pane_id}' 2>/dev/null)
+[ -n "$CURRENT_PANE" ] && rm -f "$STATE_DIR/$CURRENT_PANE.waiting"
+
 OLDEST=$(ls -tr "$STATE_DIR"/*.waiting 2>/dev/null | head -1)
 if [ -z "$OLDEST" ]; then
     tmux display-message "No Claude sessions waiting"

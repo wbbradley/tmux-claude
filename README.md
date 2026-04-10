@@ -7,7 +7,9 @@ Code session is waiting for input, and provides a keybinding to jump to it.
 
 - **Status bar indicator**: `[Claude waiting]` (or `[Claude: N waiting]`) appears
   in your tmux status bar when Claude sessions need attention
-- **Jump to waiting pane**: `prefix + g` switches to the oldest waiting Claude pane
+- **Jump to waiting pane**: `prefix + g` switches to the oldest waiting Claude
+  pane. If you're already in a waiting pane, it clears that pane's waiting state
+  and advances to the next one.
 - **Bell on wait**: a bell character is sent so tmux highlights the window immediately
 - **Auto-clear on focus**: switching to a pane clears its waiting state
 - **Zero config**: no changes to `tmux.conf` required — everything is configured
