@@ -3,22 +3,17 @@
 # Called lazily by hook scripts — safe to run repeatedly, fast no-op after first run.
 [ -n "$TMUX" ] || exit 0
 
-STATE_DIR="/tmp/tmux-claude-$(id -u)"
-MARKER="$STATE_DIR/.tmux-configured"
 BIN_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-# Fast path: already configured for this tmux server
-if [ -f "$MARKER" ]; then
-    SAVED_TMUX=$(cat "$MARKER")
-    [ "$SAVED_TMUX" = "$TMUX" ] && exit 0
-fi
-
-mkdir -p "$STATE_DIR"
-
-# Status bar
+# Status bar: prepend our segment so any user-defined static content
+# (e.g. hostname) stays on the far right.
 CURRENT_SR=$(tmux show-option -gv status-right 2>/dev/null || echo "")
 if ! echo "$CURRENT_SR" | grep -q "tmux-claude-status"; then
-    tmux set-option -ag status-right " #($BIN_DIR/tmux-claude-status)"
+    if [ -n "$CURRENT_SR" ]; then
+        tmux set-option -g status-right "#($BIN_DIR/tmux-claude-status) $CURRENT_SR"
+    else
+        tmux set-option -g status-right "#($BIN_DIR/tmux-claude-status)"
+    fi
 fi
 
 # Status bar length
@@ -27,7 +22,7 @@ if [ "$CURRENT_LEN" -lt 80 ] 2>/dev/null; then
     tmux set-option -g status-right-length 80
 fi
 
-# Keybinding
+# Keybinding (bind-key is idempotent — overwrites any prior binding)
 tmux bind-key g run-shell "$BIN_DIR/tmux-claude-jump"
 
 # Focus hooks
@@ -35,6 +30,3 @@ if ! tmux show-hooks -g 2>/dev/null | grep -q "tmux-claude-focus"; then
     tmux set-hook -ga after-select-pane "run-shell \"$BIN_DIR/tmux-claude-focus '#{pane_id}'\""
     tmux set-hook -ga after-select-window "run-shell \"$BIN_DIR/tmux-claude-focus '#{pane_id}'\""
 fi
-
-# Mark as configured for this tmux server
-printf '%s' "$TMUX" > "$MARKER"

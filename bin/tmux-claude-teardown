@@ -42,7 +42,12 @@ fi
 # 2. Strip our addition from tmux status-right (only if inside tmux)
 if [ -n "$TMUX" ]; then
     CURRENT_SR=$(tmux show-option -gv status-right 2>/dev/null || echo "")
-    CLEANED=$(echo "$CURRENT_SR" | sed "s| #($BIN_DIR/tmux-claude-status)||g")
+    # Strip whichever form is present: prepended (with trailing space),
+    # legacy appended (with leading space), or bare.
+    CLEANED=$(echo "$CURRENT_SR" \
+        | sed "s|#($BIN_DIR/tmux-claude-status) ||g" \
+        | sed "s| #($BIN_DIR/tmux-claude-status)||g" \
+        | sed "s|#($BIN_DIR/tmux-claude-status)||g")
     if [ "$CLEANED" != "$CURRENT_SR" ]; then
         tmux set-option -g status-right "$CLEANED"
         echo "Removed tmux-claude-status from status bar"

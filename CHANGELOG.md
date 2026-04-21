@@ -1,3 +1,15 @@
+## [0.1.2] - 2026-04-21
+
+### Changed
+- Status bar segment is now prepended to `status-right` instead of appended, so
+  user-defined static content (e.g. `#H` for hostname) stays on the far right.
+- Dropped the `.tmux-configured` marker fast-path in `tmux-claude-ensure-tmux`.
+  Each hook fire now re-verifies the status-right segment, so reloading
+  `.tmux.conf` re-integrates automatically instead of silently losing the
+  Claude indicator until the tmux server restarts.
+- `tmux-claude-teardown` now strips both the prepended and legacy appended
+  forms of the status segment.
+
 ## [0.1.1] - 2026-04-09
 
 ### Changed
