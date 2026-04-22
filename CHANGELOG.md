@@ -1,6 +1,10 @@
 ## [0.1.2] - 2026-04-21
 
 ### Changed
+- Hooks are now installed into `~/.claude/settings.local.json` instead of
+  `~/.claude/settings.json`. `tmux-claude-setup` automatically migrates any
+  tmux-claude hooks found in the legacy location, and `tmux-claude-teardown`
+  scrubs both files.
 - Status bar segment is now prepended to `status-right` instead of appended, so
   user-defined static content (e.g. `#H` for hostname) stays on the far right.
 - Dropped the `.tmux-configured` marker fast-path in `tmux-claude-ensure-tmux`.

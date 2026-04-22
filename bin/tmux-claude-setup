@@ -3,11 +3,49 @@ set -e
 
 BIN_DIR="$(cd "$(dirname "$0")" && pwd)"
 STATE_DIR="/tmp/tmux-claude-$(id -u)"
-SETTINGS="$HOME/.claude/settings.json"
+SETTINGS="$HOME/.claude/settings.local.json"
+LEGACY_SETTINGS="$HOME/.claude/settings.json"
 # 1. Create state directory
 mkdir -p "$STATE_DIR"
 
-# 2. Merge hooks into settings.json
+# 2. Remove any legacy tmux-claude hooks from settings.json (previous install location)
+if [ -f "$LEGACY_SETTINGS" ]; then
+    python3 -c '
+import json, sys
+
+settings_path = sys.argv[1]
+
+with open(settings_path) as f:
+    settings = json.load(f)
+
+hooks = settings.get("hooks", {})
+changed = False
+
+for event in list(hooks.keys()):
+    cleaned = [e for e in hooks[event] if not any(
+        "tmux-claude-" in h.get("command", "")
+        for h in e.get("hooks", [])
+    )]
+    if len(cleaned) != len(hooks[event]):
+        changed = True
+    if cleaned:
+        hooks[event] = cleaned
+    else:
+        del hooks[event]
+
+if changed:
+    if hooks:
+        settings["hooks"] = hooks
+    elif "hooks" in settings:
+        del settings["hooks"]
+    with open(settings_path, "w") as f:
+        json.dump(settings, f, indent=2)
+        f.write("\n")
+    print("Removed legacy tmux-claude hooks from " + settings_path)
+' "$LEGACY_SETTINGS"
+fi
+
+# 3. Merge hooks into settings.local.json
 if [ ! -f "$SETTINGS" ]; then
     echo '{}' > "$SETTINGS"
 fi
@@ -82,7 +120,7 @@ with open(settings_path, "w") as f:
 
 echo "Hooks merged into $SETTINGS"
 
-# 3. Configure tmux (now if inside tmux, otherwise lazily on first hook fire)
+# 4. Configure tmux (now if inside tmux, otherwise lazily on first hook fire)
 "$BIN_DIR/tmux-claude-ensure-tmux"
 if [ -n "$TMUX" ]; then
     echo "tmux configured: status bar + prefix-g binding + focus-clears-waiting"
