@@ -56,8 +56,7 @@ fi
 python3 -c '
 import json, sys
 
-bin_dir = sys.argv[1]
-settings_path = sys.argv[2]
+settings_path = sys.argv[1]
 
 with open(settings_path) as f:
     settings = json.load(f)
@@ -69,37 +68,37 @@ tmux_hooks = {
     "Stop": [
         {
             "matcher": "",
-            "hooks": [{"type": "command", "command": bin_dir + "/tmux-claude-notify"}]
+            "hooks": [{"type": "command", "command": "tmux-claude-notify"}]
         }
     ],
     "Notification": [
         {
             "matcher": "",
-            "hooks": [{"type": "command", "command": bin_dir + "/tmux-claude-notify"}]
+            "hooks": [{"type": "command", "command": "tmux-claude-notify"}]
         }
     ],
     "PreToolUse": [
         {
             "matcher": "AskUserQuestion",
-            "hooks": [{"type": "command", "command": bin_dir + "/tmux-claude-notify"}]
+            "hooks": [{"type": "command", "command": "tmux-claude-notify"}]
         }
     ],
     "PermissionRequest": [
         {
             "matcher": "",
-            "hooks": [{"type": "command", "command": bin_dir + "/tmux-claude-notify"}]
+            "hooks": [{"type": "command", "command": "tmux-claude-notify"}]
         }
     ],
     "UserPromptSubmit": [
         {
             "matcher": "",
-            "hooks": [{"type": "command", "command": bin_dir + "/tmux-claude-resume"}]
+            "hooks": [{"type": "command", "command": "tmux-claude-resume"}]
         }
     ],
     "SessionEnd": [
         {
             "matcher": "",
-            "hooks": [{"type": "command", "command": bin_dir + "/tmux-claude-cleanup"}]
+            "hooks": [{"type": "command", "command": "tmux-claude-cleanup"}]
         }
     ],
 }
@@ -119,7 +118,7 @@ settings["hooks"] = hooks
 with open(settings_path, "w") as f:
     json.dump(settings, f, indent=2)
     f.write("\n")
-' "$BIN_DIR" "$SETTINGS"
+' "$SETTINGS"
 
 echo "Hooks merged into $SETTINGS"
 
