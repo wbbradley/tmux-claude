@@ -3,8 +3,9 @@ set -e
 
 BIN_DIR="$(cd "$(dirname "$0")" && pwd)"
 STATE_DIR="/tmp/tmux-claude-$(id -u)"
-# 1. Remove tmux-claude hooks from both settings.local.json and legacy settings.json
-for SETTINGS in "$HOME/.claude/settings.local.json" "$HOME/.claude/settings.json"; do
+# 1. Remove tmux-claude hooks from both the active settings.json and the
+#    (never-loaded) settings.local.json a prior version wrongly wrote to.
+for SETTINGS in "$HOME/.claude/settings.json" "$HOME/.claude/settings.local.json"; do
     if [ -f "$SETTINGS" ]; then
         python3 -c '
 import json, sys

@@ -1,3 +1,25 @@
+## [0.1.3] - 2026-05-24
+
+### Fixed
+- **Hooks now install into `~/.claude/settings.json` again.** The 0.1.2 move to
+  `~/.claude/settings.local.json` was a regression: Claude Code does not load a
+  user-level `settings.local.json` (the `.local.json` variant is project-scoped
+  only), so the hooks never fired and the status bar, bell, and `prefix + g`
+  jump silently stopped working. `tmux-claude-setup` now migrates any hooks left
+  in that dead location back to `settings.json`.
+- **The waiting bell reaches tmux again**, restoring the red window highlight.
+  It was written to `/dev/tty`, which does not exist for hooks (they run without
+  a controlling terminal), so the write failed: no bell, no highlight, and the
+  failed redirect even leaked back as Stop-hook feedback. The BEL is now written
+  to the waiting pane's real tty, resolved via tmux, and `tmux-claude-notify`
+  always exits 0 so a failed bell can never surface as hook noise.
+
+### Changed
+- `tmux-claude-ensure-tmux` no longer requires `$TMUX` to be set. It configures
+  any running tmux server directly (every option it sets is server-global) and
+  is a quiet no-op when no server is running. Setup now takes effect immediately
+  even when run from outside a tmux client.
+
 ## [0.1.2] - 2026-04-21
 
 ### Changed

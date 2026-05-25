@@ -25,14 +25,16 @@ git clone <repo-url> ~/src/tmux-claude
 ```
 
 Run `tmux-claude-setup` from anywhere — inside or outside tmux. It registers
-Claude Code hooks in `~/.claude/settings.local.json` (merged with your existing
-hooks, not overwritten). The tmux-side configuration (status bar, keybinding,
-focus hooks) is set up automatically the first time a Claude Code hook fires
-inside a tmux session, so there's nothing else to do.
+Claude Code hooks in `~/.claude/settings.json` (merged with your existing hooks,
+not overwritten). The tmux-side configuration (status bar, keybinding, focus
+hooks) is applied immediately if a tmux server is running, and otherwise the
+first time a Claude Code hook fires inside a tmux session, so there's nothing
+else to do.
 
-Setup is idempotent — safe to run multiple times. If an older install left
-tmux-claude hooks in `~/.claude/settings.json`, setup automatically migrates
-them to `settings.local.json`.
+Setup is idempotent — safe to run multiple times. The 0.1.2 release mistakenly
+installed hooks into `~/.claude/settings.local.json`, which Claude Code never
+loads (the `.local.json` variant is project-scoped only); setup automatically
+migrates any such hooks back to `~/.claude/settings.json`.
 
 ## Uninstall
 
@@ -41,8 +43,9 @@ them to `settings.local.json`.
 ```
 
 This surgically removes only what was added: hooks are filtered out of
-`settings.local.json`, the status bar segment is stripped from the live
-`status-right` value, and tmux keybindings/hooks are unregistered.
+`settings.json` (and the never-loaded `settings.local.json`), the status bar
+segment is stripped from the live `status-right` value, and tmux
+keybindings/hooks are unregistered.
 
 ## How it works
 

@@ -3,13 +3,16 @@ set -e
 
 BIN_DIR="$(cd "$(dirname "$0")" && pwd)"
 STATE_DIR="/tmp/tmux-claude-$(id -u)"
-SETTINGS="$HOME/.claude/settings.local.json"
-LEGACY_SETTINGS="$HOME/.claude/settings.json"
+SETTINGS="$HOME/.claude/settings.json"
+# A USER-level settings.local.json is NOT loaded by Claude Code (the .local.json
+# variant is project-scoped only). A prior version (0.1.2) installed hooks there,
+# leaving them dead; scrub that misplaced location during setup.
+MISPLACED_SETTINGS="$HOME/.claude/settings.local.json"
 # 1. Create state directory
 mkdir -p "$STATE_DIR"
 
-# 2. Remove any legacy tmux-claude hooks from settings.json (previous install location)
-if [ -f "$LEGACY_SETTINGS" ]; then
+# 2. Remove any tmux-claude hooks from the misplaced settings.local.json (never loaded by Claude Code)
+if [ -f "$MISPLACED_SETTINGS" ]; then
     python3 -c '
 import json, sys
 
@@ -41,11 +44,11 @@ if changed:
     with open(settings_path, "w") as f:
         json.dump(settings, f, indent=2)
         f.write("\n")
-    print("Removed legacy tmux-claude hooks from " + settings_path)
-' "$LEGACY_SETTINGS"
+    print("Removed misplaced (never-loaded) tmux-claude hooks from " + settings_path)
+' "$MISPLACED_SETTINGS"
 fi
 
-# 3. Merge hooks into settings.local.json
+# 3. Merge hooks into settings.json
 if [ ! -f "$SETTINGS" ]; then
     echo '{}' > "$SETTINGS"
 fi
