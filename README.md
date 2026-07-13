@@ -1,7 +1,14 @@
 # tmux-agent
 
-Shared tmux integration for Claude Code and the Codex CLI. It shows which agents
-are waiting for input and gives both tools one timestamp-ordered jump queue.
+tmux-agent turns tmux into a shared attention queue for Claude Code and the
+Codex CLI. When either agent pauses for input or approval, it marks the pane as
+waiting, surfaces the wait in the tmux status bar, and adds it to a single queue
+ordered by when attention was requested. Press `prefix + g` to jump to the
+oldest waiting agent; focusing the pane or submitting a prompt clears the wait.
+
+Setup installs the lifecycle hooks for one or both tools and configures the live
+tmux server without requiring changes to `tmux.conf`. It can also replace the
+older tmux-claude and tmux-codex integrations while preserving pending waits.
 
 ## Features
 
