@@ -1,0 +1,66 @@
+#!/bin/sh
+set -eu
+
+BIN_DIR=$(CDPATH='' cd -- "$(dirname "$0")" && pwd)
+STATE_DIR="${TMUX_AGENT_STATE_DIR:-/tmp/tmux-agent-$(id -u)}"
+CLAUDE_STATE_DIR="${TMUX_CLAUDE_STATE_DIR:-/tmp/tmux-claude-$(id -u)}"
+CODEX_STATE_DIR="${TMUX_CODEX_STATE_DIR:-/tmp/tmux-codex-$(id -u)}"
+CODEX_HOME=${CODEX_HOME:-"$HOME/.codex"}
+TARGET=${1:-all}
+
+case "$TARGET" in
+    all | claude | codex) ;;
+    *)
+        echo "usage: tmux-agent-setup [all|claude|codex]" >&2
+        exit 2
+        ;;
+esac
+
+command -v python3 >/dev/null 2>&1 || {
+    echo "tmux-agent requires python3" >&2
+    exit 1
+}
+
+mkdir -p "$STATE_DIR"
+
+# Preserve outstanding waits from either legacy integration, including their
+# mtimes so prefix + g keeps the original interleaving order.
+migrate_state() {
+    product=$1
+    old_dir=$2
+    for old_file in "$old_dir"/*.waiting; do
+        [ -f "$old_file" ] || continue
+        pane=$(basename "$old_file" .waiting)
+        cp -p "$old_file" "$STATE_DIR/$pane.$product.waiting"
+        rm -f "$old_file"
+    done
+    rmdir "$old_dir" 2>/dev/null || true
+}
+
+if [ "$TARGET" = all ] || [ "$TARGET" = claude ]; then
+    CLAUDE_SETTINGS="$HOME/.claude/settings.json"
+    "$BIN_DIR/tmux-agent-hooks" install claude "$CLAUDE_SETTINGS" "$BIN_DIR"
+    # Claude Code never loads a user-level settings.local.json. Scrub hooks left
+    # there by tmux-claude 0.1.2 without disturbing unrelated settings.
+    "$BIN_DIR/tmux-agent-hooks" uninstall claude "$HOME/.claude/settings.local.json" "$BIN_DIR"
+    migrate_state claude "$CLAUDE_STATE_DIR"
+    echo "Claude hooks merged into $CLAUDE_SETTINGS"
+fi
+
+if [ "$TARGET" = all ] || [ "$TARGET" = codex ]; then
+    CODEX_HOOKS="$CODEX_HOME/hooks.json"
+    "$BIN_DIR/tmux-agent-hooks" install codex "$CODEX_HOOKS" "$BIN_DIR"
+    migrate_state codex "$CODEX_STATE_DIR"
+    echo "Codex hooks merged into $CODEX_HOOKS"
+fi
+
+"$BIN_DIR/tmux-agent-ensure-tmux"
+
+echo
+echo "tmux-agent setup complete."
+if [ "$TARGET" = all ] || [ "$TARGET" = codex ]; then
+    echo "  Next: start Codex, run /hooks, and trust the new user hooks"
+fi
+echo "  Status bar: shows which agents are waiting"
+echo "  prefix + g: jump to the oldest waiting Claude or Codex pane"
+echo "  Run '$BIN_DIR/tmux-agent-teardown' to uninstall"

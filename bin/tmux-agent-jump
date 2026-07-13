@@ -1,0 +1,43 @@
+#!/bin/sh
+STATE_DIR="${TMUX_AGENT_STATE_DIR:-/tmp/tmux-agent-$(id -u)}"
+
+# A pane can host either agent over time, so focusing it acknowledges every
+# waiting state associated with that pane before advancing through the queue.
+CURRENT_PANE=$(tmux display-message -p '#{pane_id}' 2>/dev/null || true)
+[ -n "$CURRENT_PANE" ] && rm -f "$STATE_DIR/$CURRENT_PANE".*.waiting
+
+while :; do
+    # State filenames contain only tmux pane ids and fixed product suffixes, so
+    # ls is safe here and remains portable across macOS and Linux.
+    # shellcheck disable=SC2012
+    OLDEST=$(ls -tr "$STATE_DIR"/*.waiting 2>/dev/null | head -1)
+    if [ -z "$OLDEST" ]; then
+        tmux display-message "No agent sessions waiting"
+        exit 0
+    fi
+
+    NAME=$(basename "$OLDEST" .waiting)
+    PANE_ID=${NAME%.*}
+    AGENT=${NAME##*.}
+    case "$AGENT" in
+        claude) AGENT_NAME=Claude ;;
+        codex) AGENT_NAME=Codex ;;
+        *)
+            rm -f "$OLDEST"
+            continue
+            ;;
+    esac
+
+    TARGET=$(tmux list-panes -a -F '#{pane_id} #{session_name}:#{window_index}' 2>/dev/null |
+        awk -v pane="$PANE_ID" '$1 == pane { print $2; exit }')
+    if [ -n "$TARGET" ]; then
+        tmux select-window -t "$TARGET"
+        tmux select-pane -t "$PANE_ID"
+        tmux display-message "$AGENT_NAME session waiting"
+        exit 0
+    fi
+
+    # Remove dead panes and keep looking so one stale entry cannot hide a live
+    # waiter later in the shared queue.
+    rm -f "$OLDEST"
+done

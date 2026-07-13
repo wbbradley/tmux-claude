@@ -1,0 +1,61 @@
+#!/bin/sh
+set -eu
+
+BIN_DIR=$(CDPATH='' cd -- "$(dirname "$0")" && pwd)
+STATE_DIR="${TMUX_AGENT_STATE_DIR:-/tmp/tmux-agent-$(id -u)}"
+CLAUDE_STATE_DIR="${TMUX_CLAUDE_STATE_DIR:-/tmp/tmux-claude-$(id -u)}"
+CODEX_STATE_DIR="${TMUX_CODEX_STATE_DIR:-/tmp/tmux-codex-$(id -u)}"
+CODEX_HOME=${CODEX_HOME:-"$HOME/.codex"}
+TARGET=${1:-all}
+
+case "$TARGET" in
+    all | claude | codex) ;;
+    *)
+        echo "usage: tmux-agent-teardown [all|claude|codex]" >&2
+        exit 2
+        ;;
+esac
+
+if [ "$TARGET" = all ] || [ "$TARGET" = claude ]; then
+    for settings in "$HOME/.claude/settings.json" "$HOME/.claude/settings.local.json"; do
+        "$BIN_DIR/tmux-agent-hooks" uninstall claude "$settings" "$BIN_DIR"
+    done
+    rm -f "$STATE_DIR"/*.claude.waiting
+    rm -rf "$CLAUDE_STATE_DIR"
+    echo "Claude hooks removed"
+fi
+
+if [ "$TARGET" = all ] || [ "$TARGET" = codex ]; then
+    "$BIN_DIR/tmux-agent-hooks" uninstall codex "$CODEX_HOME/hooks.json" "$BIN_DIR"
+    rm -f "$STATE_DIR"/*.codex.waiting
+    rm -rf "$CODEX_STATE_DIR"
+    echo "Codex hooks removed"
+fi
+
+if [ "$TARGET" = all ]; then
+    if command -v tmux >/dev/null 2>&1 && tmux list-sessions >/dev/null 2>&1; then
+        CURRENT_SR=$(tmux show-option -gv status-right 2>/dev/null || true)
+        CLEANED=$(printf '%s' "$CURRENT_SR" |
+            sed -E 's@#\([^)]*/tmux-(claude|codex|agent)-status\) ?@@g')
+        if [ "$CLEANED" != "$CURRENT_SR" ]; then
+            tmux set-option -g status-right "$CLEANED"
+        fi
+
+        tmux unbind-key g 2>/dev/null || true
+        tmux unbind-key G 2>/dev/null || true
+        for HOOK_NAME in after-select-pane after-select-window; do
+            tmux show-hooks -g 2>/dev/null |
+                awk -v name="$HOOK_NAME" '$0 ~ name && $0 ~ /tmux-(claude|codex|agent)-focus/ { if (match($0, /\[[0-9]+\]/)) print substr($0, RSTART + 1, RLENGTH - 2) }' |
+                while IFS= read -r index; do
+                    tmux set-hook -gu "${HOOK_NAME}[$index]"
+                done
+        done
+        echo "Removed shared tmux status, focus hooks, and prefix + g binding"
+    else
+        echo "No running tmux server; skipping live tmux cleanup"
+    fi
+    rm -rf "$STATE_DIR"
+fi
+
+echo
+echo "tmux-agent teardown complete."

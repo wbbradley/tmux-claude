@@ -1,0 +1,26 @@
+#!/bin/sh
+STATE_DIR="${TMUX_AGENT_STATE_DIR:-/tmp/tmux-agent-$(id -u)}"
+
+find "$STATE_DIR" -type f -name '*.waiting' -mmin +1440 -delete 2>/dev/null || true
+CLAUDE=$(find "$STATE_DIR" -type f -name '*.claude.waiting' -print 2>/dev/null | wc -l | tr -d ' ')
+CODEX=$(find "$STATE_DIR" -type f -name '*.codex.waiting' -print 2>/dev/null | wc -l | tr -d ' ')
+
+if [ "$CLAUDE" -eq 0 ] && [ "$CODEX" -eq 0 ]; then
+    printf '\n'
+elif [ "$CODEX" -eq 0 ]; then
+    if [ "$CLAUDE" -eq 1 ]; then
+        LABEL='Claude waiting'
+    else
+        LABEL="Claude: $CLAUDE waiting"
+    fi
+elif [ "$CLAUDE" -eq 0 ]; then
+    if [ "$CODEX" -eq 1 ]; then
+        LABEL='Codex waiting'
+    else
+        LABEL="Codex: $CODEX waiting"
+    fi
+else
+    LABEL="Agents waiting: Claude $CLAUDE, Codex $CODEX"
+fi
+
+printf '#[fg=yellow,bold][%s]#[default]\n' "$LABEL"

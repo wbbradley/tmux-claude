@@ -1,0 +1,32 @@
+#!/bin/sh
+STATE_DIR="${TMUX_AGENT_STATE_DIR:-/tmp/tmux-agent-$(id -u)}"
+AGENT=${1:-}
+
+# Both hook systems provide JSON on stdin. Consume it so the producer never
+# sees a broken pipe, even though TMUX_PANE supplies all the data we need.
+cat >/dev/null
+
+case "$AGENT" in
+    claude | codex) ;;
+    *) exit 2 ;;
+esac
+
+if [ -n "${TMUX_PANE:-}" ]; then
+    mkdir -p "$STATE_DIR"
+    "$(dirname "$0")/tmux-agent-ensure-tmux"
+    date +%s >"$STATE_DIR/${TMUX_PANE}.${AGENT}.waiting"
+
+    # Hook processes have no controlling terminal. Resolve the pane's tty so
+    # tmux receives the bell and can highlight the waiting window.
+    PANE_TTY=$(tmux display-message -p -t "$TMUX_PANE" '#{pane_tty}' 2>/dev/null || true)
+    if [ -n "$PANE_TTY" ] && [ -w "$PANE_TTY" ]; then
+        printf '\a' >"$PANE_TTY" 2>/dev/null || true
+    fi
+fi
+
+# Codex Stop hooks require JSON on stdout. An empty object is also a no-op for
+# PermissionRequest. Claude hooks should remain silent.
+if [ "$AGENT" = codex ]; then
+    printf '{}\n'
+fi
+exit 0

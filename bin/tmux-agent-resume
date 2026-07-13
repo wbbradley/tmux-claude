@@ -1,0 +1,9 @@
+#!/bin/sh
+STATE_DIR="${TMUX_AGENT_STATE_DIR:-/tmp/tmux-agent-$(id -u)}"
+AGENT=${1:-}
+
+# Both hook systems provide JSON on stdin. Its fields are not needed because
+# tmux identifies the pane through the environment.
+cat >/dev/null
+[ -n "${TMUX_PANE:-}" ] && [ -n "$AGENT" ] || exit 0
+rm -f "$STATE_DIR/${TMUX_PANE}.${AGENT}.waiting"

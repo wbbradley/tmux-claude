@@ -1,0 +1,6 @@
+#!/bin/sh
+STATE_DIR="${TMUX_AGENT_STATE_DIR:-/tmp/tmux-agent-$(id -u)}"
+PANE=${1:-}
+
+[ -n "$PANE" ] || exit 0
+rm -f "$STATE_DIR/$PANE".*.waiting

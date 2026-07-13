@@ -1,0 +1,49 @@
+#!/bin/sh
+# Idempotently configure the shared tmux integration for Claude Code and Codex.
+
+command -v tmux >/dev/null 2>&1 || exit 0
+tmux list-sessions >/dev/null 2>&1 || exit 0
+
+BIN_DIR=$(CDPATH='' cd -- "$(dirname "$0")" && pwd)
+
+# Claude and Codex can finish at nearly the same time. Serialize live tmux
+# changes so concurrent hook processes cannot append duplicate focus hooks.
+LOCK_NAME="tmux-agent-ensure-$(id -u)"
+tmux wait-for -L "$LOCK_NAME" >/dev/null 2>&1 || exit 0
+unlock() {
+    tmux wait-for -U "$LOCK_NAME" >/dev/null 2>&1 || true
+}
+trap unlock 0
+trap 'exit 1' HUP INT TERM
+
+# Collapse legacy tmux-claude/tmux-codex segments, regardless of checkout path,
+# into this one shared status command.
+CURRENT_SR=$(tmux show-option -gv status-right 2>/dev/null || true)
+CLEANED=$(printf '%s' "$CURRENT_SR" |
+    sed -E 's@#\([^)]*/tmux-(claude|codex|agent)-status\) ?@@g')
+if [ -n "$CLEANED" ]; then
+    tmux set-option -g status-right "#($BIN_DIR/tmux-agent-status) $CLEANED"
+else
+    tmux set-option -g status-right "#($BIN_DIR/tmux-agent-status)"
+fi
+
+CURRENT_LEN=$(tmux show-option -gv status-right-length 2>/dev/null || printf '40')
+if [ "$CURRENT_LEN" -lt 80 ] 2>/dev/null; then
+    tmux set-option -g status-right-length 80
+fi
+
+# One binding traverses the timestamp-ordered queue for both agent types.
+tmux bind-key g run-shell "$BIN_DIR/tmux-agent-jump"
+# Remove the legacy Codex-only binding installed by tmux-codex.
+tmux unbind-key G 2>/dev/null || true
+
+# Remove legacy and duplicate focus hooks, then install exactly one shared hook
+# for each focus event.
+for HOOK_NAME in after-select-pane after-select-window; do
+    tmux show-hooks -g 2>/dev/null |
+        awk -v name="$HOOK_NAME" '$0 ~ name && $0 ~ /tmux-(claude|codex|agent)-focus/ { if (match($0, /\[[0-9]+\]/)) print substr($0, RSTART + 1, RLENGTH - 2) }' |
+        while IFS= read -r index; do
+            tmux set-hook -gu "${HOOK_NAME}[$index]"
+        done
+    tmux set-hook -ga "$HOOK_NAME" "run-shell \"$BIN_DIR/tmux-agent-focus '#{pane_id}'\""
+done
