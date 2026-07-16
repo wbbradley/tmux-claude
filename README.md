@@ -42,7 +42,10 @@ git clone <repo-url> ~/src/tmux-agent
 
 Setup updates `~/.claude/settings.json` and `~/.codex/hooks.json` without
 replacing unrelated settings or hooks. It is idempotent and can be rerun after
-moving the checkout so absolute hook paths point to the new location.
+moving the checkout so absolute hook paths point to the new location. The
+`~/.claude` and `~/.codex` directories must already exist. Setup deliberately
+does not create these top-level directories, so it cannot replace or obstruct
+symlinks managed by a dotfiles or agent-configuration repository.
 
 Codex requires explicit trust for non-managed command hooks. After setup, start
 a new Codex session, run `/hooks`, review the tmux-agent entries, and trust them.

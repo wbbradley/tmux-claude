@@ -27,6 +27,10 @@ assert_no_file() {
     [ ! -e "$1" ] || fail "expected no file: $1"
 }
 
+assert_no_path() {
+    [ ! -e "$1" ] && [ ! -L "$1" ] || fail "expected no path: $1"
+}
+
 for script in "$ROOT"/bin/*; do
     [ "$(basename "$script")" = tmux-agent-hooks ] && continue
     sh -n "$script" || fail "invalid shell syntax: $script"
@@ -117,6 +121,50 @@ export TMUX_LOG="$TMP/tmux.log"
 export TMUX_AGENT_STATE_DIR="$TMP/state"
 export TMUX_CLAUDE_STATE_DIR="$TMP/claude-state"
 export TMUX_CODEX_STATE_DIR="$TMP/codex-state"
+
+# Setup must not create harness-owned config directories. In particular, a
+# stray ~/.claude directory would block a config manager from restoring its
+# symlink. Preflight all selected products before changing either one.
+mkdir -p "$TMP/missing-home/.codex"
+cat >"$TMP/missing-home/.codex/hooks.json" <<'JSON'
+{"keep": true}
+JSON
+if HOME="$TMP/missing-home" CODEX_HOME="$TMP/missing-home/.codex" \
+    "$ROOT/bin/tmux-agent-setup" all >"$TMP/missing.out" 2>&1; then
+    fail "setup succeeded without a Claude config directory"
+fi
+assert_no_path "$TMP/missing-home/.claude"
+assert_contains "$(cat "$TMP/missing.out")" "Claude config directory does not exist"
+assert_contains "$(cat "$TMP/missing-home/.codex/hooks.json")" '"keep": true'
+
+mkdir -p "$TMP/missing-codex-home/.claude"
+if HOME="$TMP/missing-codex-home" CODEX_HOME="$TMP/missing-codex-home/.codex" \
+    "$ROOT/bin/tmux-agent-setup" codex >"$TMP/missing-codex.out" 2>&1; then
+    fail "setup succeeded without a Codex config directory"
+fi
+assert_no_path "$TMP/missing-codex-home/.codex"
+assert_contains "$(cat "$TMP/missing-codex.out")" "Codex config directory does not exist"
+
+if "$ROOT/bin/tmux-agent-hooks" install claude \
+    "$TMP/helper-missing/.claude/settings.json" "$ROOT/bin" \
+    >"$TMP/helper-missing.out" 2>&1; then
+    fail "hook merger created a missing config directory"
+fi
+assert_no_path "$TMP/helper-missing"
+assert_contains "$(cat "$TMP/helper-missing.out")" "config directory does not exist"
+
+mkdir -p "$TMP/linked-home" "$TMP/managed-claude"
+cat >"$TMP/managed-claude/settings.json" <<'JSON'
+{"managed": true}
+JSON
+ln -s "$TMP/managed-claude" "$TMP/linked-home/.claude"
+HOME="$TMP/linked-home" \
+    TMUX_AGENT_STATE_DIR="$TMP/linked-state" \
+    TMUX_CLAUDE_STATE_DIR="$TMP/linked-claude-state" \
+    "$ROOT/bin/tmux-agent-setup" claude >/dev/null
+[ -L "$TMP/linked-home/.claude" ] || fail "setup replaced managed Claude symlink"
+assert_contains "$(cat "$TMP/managed-claude/settings.json")" '"managed": true'
+assert_contains "$(cat "$TMP/managed-claude/settings.json")" "tmux-agent-notify claude"
 
 export TMUX_PANE='%9'
 claude_output=$(printf '{"hook_event_name":"Stop"}' | "$ROOT/bin/tmux-agent-notify" claude)

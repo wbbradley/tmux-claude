@@ -21,6 +21,27 @@ command -v python3 >/dev/null 2>&1 || {
     exit 1
 }
 
+# Harness home directories may be symlinks managed by a dotfiles/configuration
+# repository. Never create them here: doing so can prevent that repository's
+# installer from restoring its link. Preflight every selected product before
+# making any changes so `all` cannot leave a partial installation behind.
+require_config_dir() {
+    product=$1
+    config_dir=$2
+    if [ ! -d "$config_dir" ]; then
+        echo "error: $product config directory does not exist: $config_dir" >&2
+        echo "Install or restore $product's configuration directory, then rerun tmux-agent-setup." >&2
+        exit 1
+    fi
+}
+
+if [ "$TARGET" = all ] || [ "$TARGET" = claude ]; then
+    require_config_dir Claude "$HOME/.claude"
+fi
+if [ "$TARGET" = all ] || [ "$TARGET" = codex ]; then
+    require_config_dir Codex "$CODEX_HOME"
+fi
+
 mkdir -p "$STATE_DIR"
 
 # Preserve outstanding waits from either legacy integration, including their

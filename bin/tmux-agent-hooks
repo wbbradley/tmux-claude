@@ -84,7 +84,6 @@ def install(hooks: dict[str, list[dict]], product: str, bin_dir: Path) -> None:
 
 
 def write_json(path: Path, data: dict) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.NamedTemporaryFile(
         mode="w", encoding="utf-8", dir=path.parent, delete=False
     ) as output:
@@ -109,6 +108,13 @@ def main() -> int:
     action, product = sys.argv[1:3]
     path = Path(sys.argv[3]).expanduser()
     bin_dir = Path(sys.argv[4]).resolve()
+
+    if action == "install" and not path.parent.is_dir():
+        print(
+            f"Could not update {path}: config directory does not exist: {path.parent}",
+            file=sys.stderr,
+        )
+        return 1
 
     if path.exists():
         try:
